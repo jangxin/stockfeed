@@ -9,8 +9,8 @@ router
         var resolution = req.query.resolution;
         var dateStart = req.query.from;
         var dateEnd = req.query.to;
-        var result = symbolsDatabase.symbolInfo(symbol);
-        if (result != null){
+        // var result = symbolsDatabase.symbolInfo(symbol);
+        
             var path =  '/history?symbol=' + symbol + '&resolution=' + resolution + '&from=' + dateStart + '&to=' + dateEnd;
             var options = {
               "host": "demo_feed.tradingview.com",
@@ -31,9 +31,9 @@ router
                   res.status(400).json({'status':false,'data':e});
             });
             requip.end();
-        }else{
-            res.status(404).json({data :'invaild symbol'});
-        }
+        // }else{
+        //     res.status(404).json({data :'invaild symbol'});
+        // }
     });
 router
     .route('/stockmarket')
