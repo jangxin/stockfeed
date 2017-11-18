@@ -2,39 +2,35 @@ var express = require('express');
 var http = require("http");
 var symbolsDatabase = require("./symbol_database.js");
 var router = express.Router();
+var host = "demo_feed.tradingview.com";
+
+
 router
     .route('/stockdata')
-    .get(function (req, res) {
-        var symbol = req.query.symbol;
+    .get(function (req, res) {        
+        var resData = [];
+
         var resolution = req.query.resolution;
         var dateStart = req.query.from;
-        var dateEnd = req.query.to;
-        // var result = symbolsDatabase.symbolInfo(symbol);
-        
-            var path =  '/history?symbol=' + symbol + '&resolution=' + resolution + '&from=' + dateStart + '&to=' + dateEnd;
+        var dateEnd = req.query.to; 
+        var symbol = req.query.symbol;
+        var symbols = symbol.split('%');
+        symbols.forEach(function(element) {
+            var path =  '/history?symbol=' + element + '&resolution=' + resolution + '&from=' + dateStart + '&to=' + dateEnd;
             var options = {
-              "host": "demo_feed.tradingview.com",
-              "path": path
-            };  
-            var requip = http.request(options, function (result) {
-              var chunks = [];  
-              result.on("data", function (chunk) {
-                chunks.push(chunk);
-              });  
-              result.on("end", function () {
-                var body = Buffer.concat(chunks);
-                var resultdata = JSON.parse(body.toString());
-                res.status(200).json({'status':true,'symbol' : symbol,'resolution' : resolution  ,'data': convertData(resultdata)});
-              });
-            });            
-            requip.on('error', function (e) {                  
-                  res.status(400).json({'status':false,'data':e});
-            });
-            requip.end();
-        // }else{
-        //     res.status(404).json({data :'invaild symbol'});
-        // }
-    });
+                "host": host,
+                "path": path
+            };
+            new HttpGet(options,element,resolution,getCallBack);
+        });       
+
+        function getCallBack(data){            
+            resData.push(data);
+            if (resData.length == symbols.length){
+                res.status(200).json(resData);
+            }
+        }
+});
 router
     .route('/stockmarket')
     .get(function (req, res) {
@@ -47,8 +43,9 @@ router
         }
 });
 
-function convertData(data){
+function convertData(datain,symbol,resolution){
     var resArr = [];
+    var data = parseJSONorNot(datain);
     for (var i = 0; i < data.t.length ; i ++)
     {
         var tmpValue = {
@@ -62,7 +59,45 @@ function convertData(data){
         resArr.push(tmpValue);
         
     }
-    return resArr;
+    var resData = {
+        symbol : symbol,
+        resolution : resolution,
+        tickdata : resArr
+    }
+    return resData;
 }
+function HttpGet(options, symbol, resolution, callback) {
+	function onDataCallback(response) {
+		var result = '';
+		response.on('data', function (chunk) {
+			result += chunk;
+		});
+		response.on('end', function () {
+			if (response.statusCode !== 200) {
+				callback('');
+				return;
+			}
+			callback(convertData(result,symbol,resolution));
+		});
+	}
+    var req = http.request(options, onDataCallback);
+	req.on('socket', function (socket) {
+		socket.setTimeout(5000);
+		socket.on('timeout', function () {
+				req.abort();
+		});
+	});
 
+	req.on('error', function (e) {
+		callback('');
+	});
+	req.end();
+}
+function parseJSONorNot(mayBeJSON) {
+	if (typeof mayBeJSON === 'string') {
+		return JSON.parse(mayBeJSON);
+	} else {
+		return mayBeJSON;
+	}
+}
 module.exports = router;
